@@ -1,11 +1,12 @@
 import base64
 import os
 import time
+from io import BytesIO
 
 from PIL import Image
 
 from Classes.CreateResponse import CreateResponse
-from Classes.ImageHelper import crop_image_by_proportion
+from Classes.ImageHelper import crop_image_by_proportion, crop_image_to_fixed_size
 
 
 class GalleryControl:
@@ -16,6 +17,7 @@ class GalleryControl:
         if self.upload_url is None:
             raise ValueError("Upload directory dose not exist")
 
+    #TODO: нарізати мініатюри, невивозе мережа.
     def store_images(self, request) -> CreateResponse:
         if not os.path.exists(self.upload_url):
             os.makedirs(self.upload_url)
@@ -36,6 +38,7 @@ class GalleryControl:
 
         return CreateResponse().success()
 
+    # TODO: видаляти мініатюри.
     def delete_images(self, request) -> CreateResponse:
         names = request.form.getlist('images')
         names = list(filter(lambda x: x.strip(), names))
@@ -54,10 +57,18 @@ class GalleryControl:
         images = []
         for filename in os.listdir(self.upload_url):
             filepath = os.path.join(self.upload_url, filename)
-            with open(filepath, mode='rb') as file:
+
+            with Image.open(filepath) as img:
+                cropped_img = crop_image_to_fixed_size(img, 100, 150)
+
+                buffered = BytesIO()
+                cropped_img.save(buffered, format="JPEG")
+
                 images.append({
                     'name': filename,
-                    'file': base64.b64encode(file.read()).decode('utf-8')
+                    'file': 'data:image/jpeg;base64,' + base64.b64encode(buffered.getvalue()).decode('utf-8')
                 })
+
+                buffered.close()
 
         return CreateResponse().set_data(images).success()

@@ -17,3 +17,7 @@ def crop_image_by_proportion(img, target_width_ratio, target_height_ratio):
         img = img.crop((0, offset, img.width, img.height - offset))
 
     return img.resize((target_width_ratio * 100, target_height_ratio * 100), Image.ANTIALIAS)
+
+
+def crop_image_to_fixed_size(img, width, height):
+    return img.resize((width, height), Image.ANTIALIAS)
