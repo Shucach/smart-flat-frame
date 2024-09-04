@@ -42,9 +42,9 @@ def delete_images():
 
 @app.route('/api/v1/list-images', methods=['GET'])
 def list_images():
-    return GalleryControl().list_images()
+    return GalleryControl().list_images(request)
 
 
 if __name__ == '__main__':
-    #app.run(host='0.0.0.0', port=7000, debug=True)
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=7000, debug=True)
+    #app.run(host='0.0.0.0', port=5000)

@@ -1,4 +1,5 @@
 import base64
+import math
 import os
 import time
 from io import BytesIO
@@ -53,9 +54,24 @@ class GalleryControl:
 
         return CreateResponse().success()
 
-    def list_images(self) -> CreateResponse:
+    def list_images(self, request) -> CreateResponse:
         images = []
-        for filename in os.listdir(self.upload_url):
+
+        allList = os.listdir(self.upload_url)
+
+        page = int(request.args.get('page', 1))
+        prePage = int(request.args.get('prePage', 5))
+        maxPage = math.ceil(len(allList) / prePage)
+
+        if page >= maxPage:
+            page = maxPage
+
+        if page > 1:
+            pageData = allList[prePage:prePage + prePage]
+        else:
+            pageData = allList[:prePage]
+
+        for filename in pageData:
             filepath = os.path.join(self.upload_url, filename)
 
             with Image.open(filepath) as img:
@@ -71,4 +87,13 @@ class GalleryControl:
 
                 buffered.close()
 
-        return CreateResponse().set_data(images).success()
+        res = {
+            'images': images,
+            'pagination': {
+                'page': page,
+                'prePage': prePage,
+                'maxPage': maxPage,
+            }
+        }
+
+        return CreateResponse().set_data(res).success()
