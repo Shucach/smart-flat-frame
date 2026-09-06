@@ -7,7 +7,7 @@ import time
 from PIL import Image, UnidentifiedImageError
 
 from Classes.CreateResponse import CreateResponse
-from Classes.ImageHelper import fit_to_size, normalise, save_jpeg
+from Classes.ImageHelper import fit_to_size, load_for, save_jpeg
 
 
 class GalleryControl:
@@ -26,10 +26,10 @@ class GalleryControl:
         self.thumbnail_url = os.path.join(upload_url, self.THUMBNAIL_DIRECTORY)
 
         # The panel is a 1024x600 LCD turned on its side, so the frame is portrait
-        # 600x1024 (~0.586) rather than 9:16. Pictures are stored at that exact ratio
-        # and at twice its resolution, so `fbi` scales them down 2:1 and never has to
-        # trim an edge to make them fit.
-        self.frame_size = (self.__setting('FRAME_WIDTH', 1200), self.__setting('FRAME_HEIGHT', 2048))
+        # 600x1024 (~0.586) rather than 9:16. Pictures are stored at exactly that
+        # size: `fbi` then draws them 1:1, and the decoder can skip half of every
+        # phone photo it reads, which this board needs.
+        self.frame_size = (self.__setting('FRAME_WIDTH', 600), self.__setting('FRAME_HEIGHT', 1024))
 
         # Thumbnails follow the frame ratio, so the web gallery previews the same crop
         # the frame will show.
@@ -56,7 +56,7 @@ class GalleryControl:
 
             try:
                 with Image.open(image.stream) as source:
-                    picture = fit_to_size(normalise(source), *self.frame_size)
+                    picture = fit_to_size(load_for(source, *self.frame_size), *self.frame_size)
 
                     save_jpeg(picture, os.path.join(self.upload_url, name), self.frame_quality)
                     save_jpeg(
@@ -156,7 +156,7 @@ class GalleryControl:
 
         try:
             with Image.open(os.path.join(self.upload_url, name)) as source:
-                thumbnail = fit_to_size(normalise(source), *self.thumbnail_size)
+                thumbnail = fit_to_size(load_for(source, *self.thumbnail_size), *self.thumbnail_size)
                 save_jpeg(thumbnail, self.__thumbnail_path(name), self.thumbnail_quality)
         except (UnidentifiedImageError, OSError, ValueError):
             return False

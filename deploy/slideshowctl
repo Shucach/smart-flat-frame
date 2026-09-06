@@ -1,0 +1,42 @@
+#!/bin/bash
+#
+# Starts, stops and reports the frame slideshow.
+#
+# fbi is launched from a login session rather than as a systemd service on purpose.
+# Started directly by systemd it loses the race for the console and exits within a
+# second, every time; run through sudo's PAM session it wins that race almost
+# always -- and `start` retries, so "almost" is enough.
+set -u
+
+SCRIPT=/usr/local/bin/slideshow.sh
+ATTEMPTS=5
+SETTLE=4
+
+running() { pgrep -x fbi >/dev/null; }
+
+launch() {
+    local attempt=1
+
+    while [ "$attempt" -le "$ATTEMPTS" ]; do
+        setsid "$SCRIPT" >/dev/null 2>&1 &
+        sleep "$SETTLE"
+
+        if running; then
+            echo "started on attempt $attempt"
+            return 0
+        fi
+
+        attempt=$((attempt + 1))
+    done
+
+    echo "fbi did not stay up after $ATTEMPTS attempts" >&2
+    return 1
+}
+
+case "${1:-status}" in
+    start)   running && { echo "already running"; exit 0; }; launch ;;
+    stop)    pkill -x fbi 2>/dev/null; echo "stopped" ;;
+    restart) pkill -x fbi 2>/dev/null; sleep 2; launch ;;
+    status)  running && echo active || { echo inactive; exit 3; } ;;
+    *)       echo "usage: $0 {start|stop|restart|status}" >&2; exit 2 ;;
+esac

@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from PIL import Image, UnidentifiedImageError
 
 from Classes.GalleryControl import GalleryControl
-from Classes.ImageHelper import fit_to_size, normalise, save_jpeg
+from Classes.ImageHelper import fit_to_size, load_for, save_jpeg
 
 
 def main(dry_run: bool) -> int:
@@ -39,7 +39,7 @@ def main(dry_run: bool) -> int:
         try:
             with Image.open(filepath) as source:
                 needs_crop = abs(source.width / source.height - target) > 0.01
-                picture = normalise(source)
+                picture = load_for(source, *gallery.frame_size)
 
                 if needs_crop:
                     picture = fit_to_size(picture, *gallery.frame_size)

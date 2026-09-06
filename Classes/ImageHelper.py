@@ -6,6 +6,24 @@ except AttributeError:  # Pillow < 9.1, where the constants live on the module.
     RESAMPLE = Image.LANCZOS
 
 
+def load_for(img, width, height):
+    """Opens the picture no larger than the frame actually needs.
+
+    `draft` lets the JPEG decoder halve the image while it reads it, which costs
+    nothing in quality -- it never goes below the requested box -- but saves this
+    board a lot of work on a phone photo. The box is square because EXIF may still
+    turn the picture on its side.
+    """
+    box = max(width, height)
+
+    try:
+        img.draft('RGB', (box, box))
+    except (AttributeError, ValueError):
+        pass
+
+    return normalise(img)
+
+
 def normalise(img):
     """Applies the EXIF orientation and converts to RGB so the image can be saved as JPEG."""
     img = ImageOps.exif_transpose(img)
@@ -43,7 +61,9 @@ def fit_to_size(img, width, height):
     if img.width <= width:
         return img
 
-    return img.resize((width, height), RESAMPLE)
+    # reducing_gap lets Pillow box-reduce first and only then resample, which is
+    # several times faster than LANCZOS alone on a single-core board.
+    return img.resize((width, height), RESAMPLE, reducing_gap=2.0)
 
 
 def save_jpeg(img, filepath, quality):

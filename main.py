@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import os
 
 from Classes.CreateResponse import CreateResponse
+from Classes.FrameControl import FrameControl
 from Classes.GalleryControl import GalleryControl
 
 load_dotenv()
@@ -77,6 +78,16 @@ def list_images():
         return GalleryControl().list_images(request)
     except ValueError as error:
         return CreateResponse().set_message(str(error)).failed()
+
+
+@app.route('/api/v1/restart-slideshow', methods=['POST'])
+def restart_slideshow():
+    return FrameControl().restart()
+
+
+@app.route('/api/v1/slideshow-status', methods=['GET'])
+def slideshow_status():
+    return FrameControl().status()
 
 
 if __name__ == '__main__':
