@@ -25,10 +25,19 @@ class GalleryControl:
         self.upload_url = upload_url
         self.thumbnail_url = os.path.join(upload_url, self.THUMBNAIL_DIRECTORY)
 
-        # The frame panel is portrait 9:16, and so is every tile in the web gallery,
-        # so both the stored picture and its thumbnail are cut to that ratio.
-        self.frame_size = (self.__setting('FRAME_WIDTH', 1080), self.__setting('FRAME_HEIGHT', 1920))
-        self.thumbnail_size = (self.__setting('THUMBNAIL_WIDTH', 180), self.__setting('THUMBNAIL_HEIGHT', 320))
+        # The panel is a 1024x600 LCD turned on its side, so the frame is portrait
+        # 600x1024 (~0.586) rather than 9:16. Pictures are stored at that exact ratio
+        # and at twice its resolution, so `fbi` scales them down 2:1 and never has to
+        # trim an edge to make them fit.
+        self.frame_size = (self.__setting('FRAME_WIDTH', 1200), self.__setting('FRAME_HEIGHT', 2048))
+
+        # Thumbnails follow the frame ratio, so the web gallery previews the same crop
+        # the frame will show.
+        thumbnail_width = self.__setting('THUMBNAIL_WIDTH', 180)
+        self.thumbnail_size = (
+            thumbnail_width,
+            self.__setting('THUMBNAIL_HEIGHT', self.__ratio_height(thumbnail_width)),
+        )
         self.frame_quality = self.__setting('FRAME_QUALITY', 88)
         self.thumbnail_quality = self.__setting('THUMBNAIL_QUALITY', 78)
 
@@ -180,6 +189,10 @@ class GalleryControl:
             return None
 
         return name
+
+    def __ratio_height(self, width) -> int:
+        """Returns the height that puts `width` at the frame ratio."""
+        return max(1, round(width * self.frame_size[1] / self.frame_size[0]))
 
     @staticmethod
     def __setting(key, fallback) -> int:
