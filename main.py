@@ -10,6 +10,23 @@ load_dotenv()
 app = Flask(__name__)
 
 
+def upload_limit():
+    """Caps the request body, in megabytes.
+
+    Clips weigh a great deal more than photographs, and this board has 430MB of
+    RAM: without a ceiling one bad upload is enough to take the frame down.
+    """
+    try:
+        megabytes = int(os.getenv('MAX_UPLOAD_MB', 256))
+    except (TypeError, ValueError):
+        megabytes = 256
+
+    return max(1, megabytes) * 1024 * 1024
+
+
+app.config['MAX_CONTENT_LENGTH'] = upload_limit()
+
+
 def collect_names(request):
     """
     Reads the image names out of a request body.
@@ -34,6 +51,11 @@ def collect_names(request):
         names = [value for key, value in request.form.items(multi=True) if key.startswith('images[')]
 
     return [name for name in names if name.strip()]
+
+
+@app.errorhandler(413)
+def upload_too_large(_):
+    return CreateResponse().set_message('Upload is larger than the frame accepts').failed()
 
 
 # Routes

@@ -1,0 +1,31 @@
+# Panel settings for /usr/local/bin/framecast.py, read by slideshowctl.
+#
+# Install as /etc/default/framecast. Every line is optional: the values shown are
+# the ones the player falls back to on its own. The API's .env is a separate file
+# and stays that way -- the player is a system service and has no business reading
+# the application's key.
+
+# Where the gallery lives. Must agree with UPLOAD_PATH in the API's .env.
+#GALLERY=/home/pi/images_api/images
+
+# How long a still holds the panel, in seconds.
+#DELAY=60
+
+# How long a clip holds it. The clip loops inside its slot, so a five-second video
+# plays through twelve times in a sixty-second slot rather than leaving the frame
+# on a frozen last frame. Set it shorter than DELAY if video should get less time.
+#VIDEO_DELAY=60
+
+# How long to wait before looking again when the gallery is empty.
+#EMPTY_DELAY=15
+
+# Rotation applied to the clip, in degrees. Zero is correct on this panel: the
+# compositor rotates the framebuffer layer, and omxplayer's layer inherits the
+# same transform, so a clip comes out the same way up as a still. Change it only
+# if video plays sideways between two upright photographs.
+#VIDEO_ORIENTATION=0
+
+# The virtual terminal the panel sits on. It needs to be one with no getty.
+#VT=7
+
+#FRAMEBUFFER=/dev/fb0

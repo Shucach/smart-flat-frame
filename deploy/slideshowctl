@@ -1,42 +1,98 @@
 #!/bin/bash
 #
-# Starts, stops and reports the frame slideshow.
+# Starts, stops and reports the frame player.
 #
-# fbi is launched from a login session rather than as a systemd service on purpose.
-# Started directly by systemd it loses the race for the console and exits within a
-# second, every time; run through sudo's PAM session it wins that race almost
-# always -- and `start` retries, so "almost" is enough.
+# The five-attempt retry loop that used to live here belonged to fbi, which lost
+# the race for the console often enough to need it. framecast.py writes the
+# framebuffer and claims no console, so it either comes up or says why in the log.
 set -u
 
-SCRIPT=/usr/local/bin/slideshow.sh
-ATTEMPTS=5
-SETTLE=4
+PLAYER=/usr/local/bin/framecast.py
+PYTHON=${PYTHON:-/var/python_app/prenv/bin/python3}
+LOG=${LOG:-/var/log/framecast.log}
+PIDFILE=${PIDFILE:-/run/framecast.pid}
+SETTLE=3
 
-running() { pgrep -x fbi >/dev/null; }
+# Panel settings live here rather than in the API's .env: the player is a system
+# service and has no business reading the application's secrets.
+GALLERY=/home/pi/images_api/images
+DELAY=60
+VIDEO_DELAY=60
+VIDEO_ORIENTATION=0
+EMPTY_DELAY=15
+FRAMEBUFFER=/dev/fb0
+VT=7
+
+# shellcheck source=/dev/null
+[ -r /etc/default/framecast ] && . /etc/default/framecast
+
+export GALLERY DELAY VIDEO_DELAY VIDEO_ORIENTATION EMPTY_DELAY FRAMEBUFFER VT PIDFILE
+
+# The player writes its own pid. Matching on the script path instead -- which is
+# what this did while the player was fbi -- turns out to match any process that
+# merely mentions the path, an ssh command line included, and a false "already
+# running" leaves the panel dark with nothing in the log to say why.
+player_pid() {
+    local pid
+
+    if [ -r "$PIDFILE" ] && read -r pid <"$PIDFILE" 2>/dev/null && [ -n "${pid:-}" ] &&
+       grep -qa framecast.py "/proc/$pid/cmdline" 2>/dev/null; then
+        echo "$pid"
+        return 0
+    fi
+
+    # Fallback for a player whose pid file was lost, so that a stale /run cannot
+    # end in two players writing the same framebuffer. The pattern is anchored at
+    # the interpreter deliberately: an unanchored match on the script path is what
+    # made the old check see a player in any command line that named the file.
+    pid=$(pgrep -f "^[^ ]*python[0-9.]* $PLAYER\$" | head -n 1) || return 1
+    [ -n "$pid" ] || return 1
+    echo "$pid"
+}
+
+running() { player_pid >/dev/null; }
 
 launch() {
-    local attempt=1
+    setsid "$PYTHON" "$PLAYER" >>"$LOG" 2>&1 &
+    sleep "$SETTLE"
 
-    while [ "$attempt" -le "$ATTEMPTS" ]; do
-        setsid "$SCRIPT" >/dev/null 2>&1 &
-        sleep "$SETTLE"
+    if running; then
+        echo "started"
+        return 0
+    fi
 
-        if running; then
-            echo "started on attempt $attempt"
-            return 0
-        fi
+    echo "player did not start; see $LOG" >&2
+    tail -n 5 "$LOG" >&2 2>/dev/null
+    return 1
+}
 
-        attempt=$((attempt + 1))
+halt() {
+    local pid
+    pid=$(player_pid) || { echo "stopped"; return 0; }
+
+    kill "$pid" 2>/dev/null
+
+    for _ in 1 2 3 4 5; do
+        running || break
+        sleep 1
     done
 
-    echo "fbi did not stay up after $ATTEMPTS attempts" >&2
-    return 1
+    running && kill -9 "$pid" 2>/dev/null
+    rm -f "$PIDFILE"
+    # The player takes its clip down on the way out, but a player that was killed
+    # rather than asked would leave omxplayer holding the panel.
+    pkill -x omxplayer.bin 2>/dev/null
+    echo "stopped"
 }
 
 case "${1:-status}" in
     start)   running && { echo "already running"; exit 0; }; launch ;;
-    stop)    pkill -x fbi 2>/dev/null; echo "stopped" ;;
-    restart) pkill -x fbi 2>/dev/null; sleep 2; launch ;;
+    stop)    halt ;;
+    restart) halt; sleep 1; launch ;;
+    # What the API calls. The player re-reads the gallery every pass anyway, so a
+    # running player only needs a nudge -- which returns at once, where a restart
+    # cost the caller seven seconds.
+    reload)  pid=$(player_pid) && kill -HUP "$pid" && echo "reloaded" || launch ;;
     status)  running && echo active || { echo inactive; exit 3; } ;;
-    *)       echo "usage: $0 {start|stop|restart|status}" >&2; exit 2 ;;
+    *)       echo "usage: $0 {start|stop|restart|reload|status}" >&2; exit 2 ;;
 esac

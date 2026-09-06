@@ -10,12 +10,15 @@ class FrameControl:
     TIMEOUT = 60
 
     def restart(self) -> CreateResponse:
-        """Restarts the slideshow so it picks up whatever is on disk right now.
+        """Tells the player to pick up whatever is on disk right now.
 
-        `fbi` reads its picture list once, at startup, so a freshly uploaded photo
-        only reaches the frame after this.
+        The player re-reads the gallery on every pass, so an upload reaches the
+        panel by itself within one slot; this only makes it immediate. It used to
+        be a real restart because `fbi` read its picture list once and never
+        again, and it cost the caller seven seconds. A nudge costs nothing, and
+        `slideshowctl reload` still starts the player outright if it is down.
         """
-        code, output = self.__control('restart')
+        code, output = self.__control('reload')
 
         if code != 0:
             return CreateResponse().set_message(output or 'Slideshow could not be restarted').failed()
